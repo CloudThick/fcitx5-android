@@ -54,7 +54,8 @@ class TextKeyboard(
                 DualSymbolAlphabetKey("F", ";", "；"),
                 DualSymbolAlphabetKey("G", "(", "（"),
                 DualSymbolAlphabetKey("H", ")", "）"),
-                DualSymbolAlphabetKey("J", "~", "～"),
+                // ~ stays half-width even in Chinese text
+                DualSymbolAlphabetKey("J", "~", "~"),
                 DualSymbolAlphabetKey("K", "\"", "“"),
                 DualSymbolAlphabetKey("L", "'", "”")
             ),
