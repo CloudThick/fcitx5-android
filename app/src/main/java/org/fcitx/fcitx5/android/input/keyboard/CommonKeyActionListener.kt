@@ -167,7 +167,7 @@ class CommonKeyActionListener :
                     if (!preeditState.isEmpty) {
                         service.postFcitxJob { reset() }
                     } else {
-                        service.clearAllText()
+                        service.clearTextBeforeCursor()
                     }
                 }
                 is PickerSwitchAction -> {

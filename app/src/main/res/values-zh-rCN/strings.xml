@@ -335,4 +335,8 @@
     <string name="key_text_scale_medium">中 (94%)</string>
     <string name="key_text_scale_default">默认 (100%)</string>
     <string name="key_text_scale_large">大 (108%)</string>
+    <string name="clipboard_search">搜索剪贴板</string>
+    <string name="clipboard_search_hint">搜索剪贴板记录</string>
+    <string name="clipboard_search_clear">清除搜索</string>
+    <string name="keyboard_candidate_text_size">键盘候选栏字体大小</string>
 </resources>

@@ -335,4 +335,8 @@
     <string name="key_text_scale_medium">Medium (94%)</string>
     <string name="key_text_scale_default">Default (100%)</string>
     <string name="key_text_scale_large">Large (108%)</string>
+    <string name="clipboard_search">Search clipboard</string>
+    <string name="clipboard_search_hint">Search clipboard history</string>
+    <string name="clipboard_search_clear">Clear search</string>
+    <string name="keyboard_candidate_text_size">Keyboard candidate bar font size</string>
 </resources>

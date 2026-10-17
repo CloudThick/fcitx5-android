@@ -457,6 +457,30 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onCandidateUpdate(data: CandidateListEvent.Data) {
         barStateMachine.push(CandidatesUpdated, CandidateEmpty to data.candidates.isEmpty())
+        lastCandidatesEmpty = data.candidates.isEmpty()
+        updateTitleCandidatesOverlay()
+    }
+
+    private var lastCandidatesEmpty = true
+
+    /**
+     * While an extended window (title bar state) needs text input, e.g. clipboard search,
+     * temporarily show the candidate bar over the title bar whenever there are candidates.
+     * The state machine stays in Title, so switching back restores the title untouched.
+     */
+    var titleCandidatesOverlay = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateTitleCandidatesOverlay()
+        }
+
+    private fun updateTitleCandidatesOverlay() {
+        if (barStateMachine.currentState != KawaiiBarStateMachine.State.Title) return
+        val showCandidates = titleCandidatesOverlay && !lastCandidatesEmpty
+        // switch children directly; switchUiByState() would reset the title bar
+        view.displayedChild = if (showCandidates) KawaiiBarStateMachine.State.Candidate.ordinal
+        else KawaiiBarStateMachine.State.Title.ordinal
     }
 
     override fun onWindowAttached(window: InputWindow) {

@@ -154,7 +154,18 @@ class InputView(
         keyboardHeightPercentBase,
     )
 
-    private val keyboardHeightPx: Int
+    /**
+     * Extra height added above the keyboard area, e.g. while the clipboard
+     * search box shows results and an embedded keyboard at the same time.
+     */
+    var extraWindowHeight: Int = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            updateKeyboardSize()
+        }
+
+    val keyboardHeightPx: Int
         get() {
             val baseType = keyboardHeightPercentBase.getValue()
             val base = when (baseType) {
@@ -282,7 +293,7 @@ class InputView(
 
     private fun updateKeyboardSize() {
         windowManager.view.updateLayoutParams {
-            height = keyboardHeightPx
+            height = keyboardHeightPx + extraWindowHeight
         }
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx

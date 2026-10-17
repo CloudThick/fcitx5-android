@@ -45,7 +45,7 @@ sealed class KeyAction {
 
     /**
      * Swipe up on backspace: clear the composing text if any,
-     * otherwise clear all text in the editor.
+     * otherwise delete everything before the cursor.
      */
     data object ClearAllAction : KeyAction()
 

@@ -104,6 +104,14 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     fun allEntries() = clbDao.allEntries()
 
+    /** Substring search (case-insensitive for ASCII, as SQLite LIKE) */
+    fun searchEntries(query: String) = clbDao.searchEntries(
+        "%" + query
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_") + "%"
+    )
+
     suspend fun pin(id: Int) = clbDao.updatePinStatus(id, true)
 
     suspend fun unpin(id: Int) = clbDao.updatePinStatus(id, false)

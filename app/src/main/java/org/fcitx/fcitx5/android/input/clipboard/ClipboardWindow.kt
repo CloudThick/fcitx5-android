@@ -25,14 +25,28 @@ import com.google.android.material.snackbar.BaseTransientBottomBar.BaseCallback
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.snackbar.SnackbarContentLayout
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
+import org.fcitx.fcitx5.android.input.dependency.fcitx
+import org.fcitx.fcitx5.android.input.dependency.inputView
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.AddMore
@@ -54,11 +68,18 @@ import splitties.dimensions.dp
 import splitties.resources.styledColor
 import splitties.views.dsl.core.withTheme
 
-class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
+class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(),
+    InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
+    private val fcitx by manager.fcitx()
+    private val inputView by manager.inputView()
+    private val bar: KawaiiBarComponent by manager.must()
+    private val popup: PopupComponent by manager.must()
+    private val commonKeyActionListener: CommonKeyActionListener by manager.must()
+    private val punctuation: PunctuationComponent by manager.must()
 
     private val snackbarCtx by lazy {
         context.withTheme(R.style.InputViewSnackbarTheme)
@@ -82,10 +103,143 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private val clipboardEntryRadius by ThemeManager.prefs.clipboardEntryRadius
 
-    private val clipboardEntriesPager by lazy {
-        Pager(PagingConfig(pageSize = 16)) { ClipboardManager.allEntries() }
-    }
     private var adapterSubmitJob: Job? = null
+
+    private fun submitEntries() {
+        val q = query
+        val pager = Pager(PagingConfig(pageSize = 16)) {
+            if (q.isEmpty()) ClipboardManager.allEntries() else ClipboardManager.searchEntries(q)
+        }
+        adapterSubmitJob?.cancel()
+        adapterSubmitJob = service.lifecycleScope.launch {
+            pager.flow.collect { adapter.submitData(it) }
+        }
+    }
+
+    // ---------------- search ----------------
+
+    private var query = ""
+
+    /** search bar shown and list filtered */
+    private var searching = false
+
+    /** embedded keyboard shown, keyboard output redirected into the query */
+    private var typing = false
+
+    private var querySubmitJob: Job? = null
+
+    private fun setQuery(q: String) {
+        if (q == query) return
+        query = q
+        ui.searchText.text = q
+        // debounce: don't hit the database on every keystroke
+        querySubmitJob?.cancel()
+        querySubmitJob = service.lifecycleScope.launch {
+            delay(150L)
+            submitEntries()
+        }
+    }
+
+    private val searchRedirect = object : FcitxInputMethodService.TextRedirect {
+        override fun commit(text: String) = setQuery(query + text)
+        override fun backspace() {
+            if (query.isEmpty()) return
+            setQuery(query.substring(0, query.offsetByCodePoints(query.length, -1)))
+        }
+        override fun clear() = setQuery("")
+        override fun enter() = stopTyping()
+    }
+
+    private val textKeyboard by lazy { TextKeyboard(context, theme) }
+    private val numberKeyboard by lazy { NumberKeyboard(context, theme) }
+    private var embeddedKeyboard: BaseKeyboard? = null
+
+    private val embeddedKeyActionListener = KeyActionListener { action, source ->
+        if (action is KeyAction.LayoutSwitchAction) {
+            when (action.act) {
+                TextKeyboard.Name -> attachEmbeddedKeyboard(textKeyboard)
+                "", NumberKeyboard.Name -> attachEmbeddedKeyboard(numberKeyboard)
+                // symbol/emoji pickers would replace this window; not supported here
+                else -> {}
+            }
+        } else {
+            commonKeyActionListener.listener.onKeyAction(action, source)
+        }
+    }
+
+    private fun detachEmbeddedKeyboard() {
+        embeddedKeyboard?.let {
+            it.onDetach()
+            ui.keyboardContainer.removeView(it)
+            it.keyActionListener = null
+            it.popupActionListener = null
+        }
+        embeddedKeyboard = null
+        popup.dismissAll()
+    }
+
+    private fun attachEmbeddedKeyboard(kb: BaseKeyboard) {
+        if (kb === embeddedKeyboard) return
+        detachEmbeddedKeyboard()
+        embeddedKeyboard = kb
+        kb.keyActionListener = embeddedKeyActionListener
+        kb.popupActionListener = popup.listener
+        ui.keyboardContainer.addView(
+            kb, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        kb.onAttach()
+        kb.onReturnDrawableUpdate(R.drawable.ic_baseline_search_24)
+        kb.onInputMethodUpdate(fcitx.runImmediately { inputMethodEntryCached })
+        kb.onPunctuationUpdate(punctuation.mapping)
+    }
+
+    private fun startTyping() {
+        if (typing) return
+        searching = true
+        typing = true
+        ui.searchBar.visibility = View.VISIBLE
+        ui.setKeyboardHeight(inputView.keyboardHeightPx)
+        ui.keyboardContainer.visibility = View.VISIBLE
+        // room for the search bar + a few rows of results above the keyboard
+        inputView.extraWindowHeight = context.dp(SEARCH_EXTRA_HEIGHT)
+        attachEmbeddedKeyboard(textKeyboard)
+        service.textRedirect = searchRedirect
+        bar.titleCandidatesOverlay = true
+    }
+
+    /** hide the embedded keyboard, keep the filtered list */
+    private fun stopTyping() {
+        if (!typing) return
+        typing = false
+        service.textRedirect = null
+        bar.titleCandidatesOverlay = false
+        detachEmbeddedKeyboard()
+        ui.keyboardContainer.visibility = View.GONE
+        inputView.extraWindowHeight = 0
+        if (query.isEmpty()) exitSearch()
+    }
+
+    private fun exitSearch() {
+        stopTyping()
+        if (!searching) return
+        searching = false
+        ui.searchBar.visibility = View.GONE
+        querySubmitJob?.cancel()
+        query = ""
+        ui.searchText.text = ""
+        submitEntries()
+        stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to (ClipboardManager.itemCount == 0))
+    }
+
+    override fun onImeUpdate(ime: InputMethodEntry) {
+        embeddedKeyboard?.onInputMethodUpdate(ime)
+    }
+
+    override fun onPunctuationUpdate(mapping: Map<String, String>) {
+        embeddedKeyboard?.onPunctuationUpdate(mapping)
+    }
 
     private val adapter: ClipboardAdapter by lazy {
         object : ClipboardAdapter(
@@ -124,7 +278,9 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             }
 
             override fun onPaste(entry: ClipboardEntry) {
-                service.commitText(entry.text)
+                // keep the filtered results, but the paste itself must reach the app
+                stopTyping()
+                service.commitTextToEditor(entry.text)
                 if (clipboardReturnAfterPaste) windowManager.attachWindow(KeyboardWindow)
             }
         }
@@ -162,6 +318,13 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             }).attachToRecyclerView(recyclerView)
             enableUi.enableButton.setOnClickListener {
                 clipboardEnabledPref.setValue(true)
+            }
+            searchButton.setOnClickListener {
+                if (searching) exitSearch() else startTyping()
+            }
+            searchText.setOnClickListener { startTyping() }
+            searchClearButton.setOnClickListener {
+                if (typing && query.isNotEmpty()) setQuery("") else exitSearch()
             }
             deleteAllButton.setOnClickListener {
                 service.lifecycleScope.launch {
@@ -265,18 +428,24 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         // manually switch to initial ui
         ui.switchUiByState(initialState)
         adapter.addLoadStateListener {
+            // an empty search result is not an empty clipboard
+            if (searching) return@addLoadStateListener
             val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
         }
-        adapterSubmitJob = service.lifecycleScope.launch {
-            clipboardEntriesPager.flow.collect {
-                adapter.submitData(it)
-            }
-        }
+        submitEntries()
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
     }
 
     override fun onDetached() {
+        // must run before the bar reacts to the window detaching
+        typing = false
+        searching = false
+        service.textRedirect = null
+        bar.titleCandidatesOverlay = false
+        detachEmbeddedKeyboard()
+        inputView.extraWindowHeight = 0
+        querySubmitJob?.cancel()
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
         adapter.onDetached()
         adapterSubmitJob?.cancel()
@@ -289,4 +458,9 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     override fun onCreateBarExtension(): View = ui.extension
+
+    companion object {
+        /** search bar (40dp) + results area (180dp) */
+        private const val SEARCH_EXTRA_HEIGHT = 220
+    }
 }

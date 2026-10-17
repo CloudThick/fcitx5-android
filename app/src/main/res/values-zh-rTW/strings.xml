@@ -330,4 +330,8 @@
     <string name="key_text_scale_medium">中 (94%)</string>
     <string name="key_text_scale_default">預設 (100%)</string>
     <string name="key_text_scale_large">大 (108%)</string>
+    <string name="clipboard_search">搜尋剪貼簿</string>
+    <string name="clipboard_search_hint">搜尋剪貼簿紀錄</string>
+    <string name="clipboard_search_clear">清除搜尋</string>
+    <string name="keyboard_candidate_text_size">鍵盤候選欄字體大小</string>
 </resources>

@@ -11,7 +11,6 @@ import android.graphics.drawable.shapes.RectShape
 import android.text.Spanned
 import android.text.SpannedString
 import android.text.style.DynamicDrawableSpan
-import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
 import androidx.annotation.ColorInt
@@ -53,30 +52,6 @@ open class PreeditUi(
 
     private val upView = createTextView()
 
-    /**
-     * Called with the tapped position as an index into the *preedit* string
-     * (aux text and the drawn cursor glyph excluded).
-     */
-    var onPreeditTap: ((Int) -> Unit)? = null
-
-    private var auxUpLength = 0
-    private var preeditLength = 0
-    private var drawnCursor = -1
-
-    init {
-        upView.setOnTouchListener { v, e ->
-            val callback = onPreeditTap ?: return@setOnTouchListener false
-            if (preeditLength <= 0) return@setOnTouchListener false
-            if (e.actionMasked == MotionEvent.ACTION_UP) {
-                var offset = (v as TextView).getOffsetForPosition(e.x, e.y)
-                // a '|' glyph is inserted at the cursor position when drawing
-                if (drawnCursor >= 0 && offset > drawnCursor) offset -= 1
-                callback((offset - auxUpLength).coerceIn(0, preeditLength))
-            }
-            true
-        }
-    }
-
     private val downView = createTextView()
 
     var visible = false
@@ -109,8 +84,6 @@ open class PreeditUi(
                 else inputPanel.auxUp.length + it
             }
         }
-        auxUpLength = inputPanel.auxUp.toString().length
-        preeditLength = inputPanel.preedit.toString().length
         val downString = inputPanel.auxDown.toSpannedString(activeBkg)
         val hasUp = upString.isNotEmpty()
         val hasDown = downString.isNotEmpty()
@@ -120,7 +93,6 @@ open class PreeditUi(
             updateTextView(downView, "", false)
             return
         }
-        drawnCursor = if (upCursor < 0 || upCursor == upString.length) -1 else upCursor
         val upStringWithCursor = if (upCursor < 0 || upCursor == upString.length) {
             upString
         } else buildSpannedString {

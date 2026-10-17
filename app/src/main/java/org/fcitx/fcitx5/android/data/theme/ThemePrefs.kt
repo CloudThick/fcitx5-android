@@ -90,6 +90,18 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val clipboardEntryRadius =
         int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp")
 
+    /**
+     * Candidate text size in the on-screen keyboard's candidate bar.
+     * (The existing "candidates font size" only applies to the floating candidate
+     * window used with physical keyboards.)
+     * Capped at 26sp: the bar is 40dp tall and larger text would just be scaled down.
+     */
+    val keyboardCandidateTextSize = int(
+        R.string.keyboard_candidate_text_size,
+        "keyboard_candidate_text_size",
+        20, 12, 26, "sp"
+    )
+
     /** Fine-grained key label size presets, relative to upstream's sizes. */
     enum class KeyTextScale(override val stringRes: Int, val factor: Float) : ManagedPreferenceEnum {
         XSmall(R.string.key_text_scale_xsmall, 0.80f),
