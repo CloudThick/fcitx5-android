@@ -56,6 +56,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
 
     val bordered: Boolean
     val borderStroke: Boolean
+    /** user-selected key label size multiplier */
+    val textScale: Float
     val rippled: Boolean
     val radius: Float
     val hMargin: Int
@@ -66,6 +68,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         bordered = prefs.keyBorder.getValue()
         borderStroke = prefs.keyBorderStroke.getValue()
         rippled = prefs.keyRippleEffect.getValue()
+        textScale = prefs.keyTextScale.getValue().factor
         radius = dp(prefs.keyRadius.getValue().toFloat())
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val hMarginPref =
@@ -256,7 +259,7 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         isFocusable = false
         background = null
         text = def.displayText
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize * textScale)
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         // keep original typeface, apply textStyle only
         setTypeface(typeface, def.textStyle)
@@ -285,7 +288,7 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         isClickable = false
         isFocusable = false
         // TODO hardcoded alt text size
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f)
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f * textScale)
         setTypeface(typeface, Typeface.BOLD)
         text = def.altText
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
@@ -321,6 +324,31 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
             topToTop = parentId; topMargin = vMargin
             leftToLeft = unset
             rightToRight = parentId; rightMargin = hMargin + dp(4)
+        }
+    }
+
+    /**
+     * WeChat-style: a small, regular-weight symbol centered above the letter,
+     * with the letter itself pushed slightly below the vertical center.
+     */
+    private fun applyTopAltTextPosition() {
+        mainText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            // reset
+            bottomToTop = unset
+            // set
+            topToTop = parentId; topMargin = vMargin + dp(6)
+            bottomToBottom = parentId; bottomMargin = vMargin
+        }
+        altText.visibility = View.VISIBLE
+        altText.setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
+        altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            // reset
+            bottomToBottom = unset; bottomMargin = 0
+            rightMargin = 0
+            // set
+            leftToLeft = parentId
+            rightToRight = parentId
+            topToTop = parentId; topMargin = vMargin + dp(2)
         }
     }
 
@@ -363,13 +391,16 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
                 else -> applyBottomAltTextPosition()
             }
             PunctuationPosition.TopRight -> applyTopRightAltTextPosition()
+            PunctuationPosition.Top -> applyTopAltTextPosition()
             PunctuationPosition.None -> applyNoAltTextPosition()
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        if (ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight) {
-            return
+        when (ThemeManager.prefs.punctuationPosition.getValue()) {
+            // orientation-independent layouts
+            PunctuationPosition.TopRight, PunctuationPosition.Top -> return
+            else -> {}
         }
         applyLayout(newConfig.orientation)
     }

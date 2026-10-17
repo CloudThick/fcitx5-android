@@ -21,6 +21,12 @@ sealed class KeyAction {
 
     data class CommitAction(val text: String) : KeyAction()
 
+    /**
+     * A symbol that differs between Chinese and English punctuation mode.
+     * Resolved into a concrete action by [TextKeyboard] before dispatch.
+     */
+    data class ModeSymbolAction(val en: String, val zh: String) : KeyAction()
+
     data class CapsAction(val lock: Boolean) : KeyAction()
 
     data object QuickPhraseAction : KeyAction()
@@ -36,6 +42,12 @@ sealed class KeyAction {
     data class MoveSelectionAction(val start: Int = 0, val end: Int = 0) : KeyAction()
 
     data class DeleteSelectionAction(val totalCnt: Int = 0) : KeyAction()
+
+    /**
+     * Swipe up on backspace: clear the composing text if any,
+     * otherwise delete everything before the cursor.
+     */
+    data object ClearAllAction : KeyAction()
 
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 

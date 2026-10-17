@@ -159,7 +159,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val swipeSymbolDirection = enumList(
             R.string.swipe_symbol_behavior,
             "swipe_symbol_behavior",
-            SwipeSymbolDirection.Down
+            // WeChat-style: symbols are typed by swiping up
+            SwipeSymbolDirection.Up
         )
         val longPressDelay = int(
             R.string.keyboard_long_press_delay,
@@ -182,7 +183,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val langSwitchKeyBehavior = enumList(
             R.string.lang_switch_key_behavior,
             "lang_switch_key_behavior",
-            LangSwitchBehavior.Enumerate
+            // WeChat-style 中/英 key: toggle between English and the last Chinese IM
+            LangSwitchBehavior.ToggleActivate
         ) { showLangSwitchKey.getValue() }
 
         val keyboardHeightPercent: ManagedPreference.PInt

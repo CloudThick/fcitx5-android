@@ -9,7 +9,6 @@ import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.StringRes
 import androidx.core.content.edit
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
@@ -34,7 +33,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         return pref
     }
 
-    val keyBorder = switch(R.string.key_border, "key_border", false)
+    val keyBorder = switch(R.string.key_border, "key_border", true)
 
     val keyBorderStroke = switch(
         R.string.key_border_stroke, "key_border_stroke", false,
@@ -71,7 +70,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
             R.string.key_vertical_margin,
             R.string.portrait,
             "key_vertical_margin",
-            7,
+            5,
             R.string.landscape,
             "key_vertical_margin_landscape",
             4,
@@ -83,7 +82,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         keyVerticalMarginLandscape = secondary
     }
 
-    val keyRadius = int(R.string.key_radius, "key_radius", 4, 0, 48, "dp")
+    val keyRadius = int(R.string.key_radius, "key_radius", 6, 0, 48, "dp")
 
     val textEditingButtonRadius =
         int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
@@ -91,16 +90,46 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val clipboardEntryRadius =
         int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp")
 
+    /**
+     * Candidate text size in the on-screen keyboard's candidate bar.
+     * (The existing "candidates font size" only applies to the floating candidate
+     * window used with physical keyboards.)
+     * Capped at 26sp: the bar is 40dp tall and larger text would just be scaled down.
+     */
+    val keyboardCandidateTextSize = int(
+        R.string.keyboard_candidate_text_size,
+        "keyboard_candidate_text_size",
+        20, 12, 26, "sp"
+    )
+
+    /** Fine-grained key label size presets, relative to upstream's sizes. */
+    enum class KeyTextScale(override val stringRes: Int, val factor: Float) : ManagedPreferenceEnum {
+        XSmall(R.string.key_text_scale_xsmall, 0.80f),
+        Small(R.string.key_text_scale_small, 0.88f),
+        Medium(R.string.key_text_scale_medium, 0.94f),
+        Default(R.string.key_text_scale_default, 1.00f),
+        Large(R.string.key_text_scale_large, 1.08f);
+    }
+
+    val keyTextScale = enumList(
+        R.string.key_text_scale,
+        "key_text_scale",
+        // WeChat's key labels are a bit smaller than upstream's
+        KeyTextScale.Small
+    )
+
     enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.punctuation_pos_none),
         Bottom(R.string.punctuation_pos_bottom),
-        TopRight(R.string.punctuation_pos_top_right);
+        TopRight(R.string.punctuation_pos_top_right),
+        Top(R.string.punctuation_pos_top);
     }
 
     val punctuationPosition = enumList(
         R.string.punctuation_position,
         "punctuation_position",
-        PunctuationPosition.Bottom
+        // WeChat-style: small symbol label centered above the letter
+        PunctuationPosition.Top
     )
 
     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
@@ -143,7 +172,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val lightModeTheme = themePreference(
         R.string.light_mode_theme,
         "light_mode_theme",
-        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
+        ThemePreset.WeChatLight,
         enableUiOn = {
             followSystemDayNightTheme.getValue()
         })
@@ -151,7 +180,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val darkModeTheme = themePreference(
         R.string.dark_mode_theme,
         "dark_mode_theme",
-        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
+        ThemePreset.WeChatDark,
         enableUiOn = {
             followSystemDayNightTheme.getValue()
         })

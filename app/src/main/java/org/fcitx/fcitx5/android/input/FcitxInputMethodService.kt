@@ -337,7 +337,30 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    /**
+     * When set, text output of the keyboard (commits, backspace, enter) goes to this
+     * target instead of the app's editor; used by the in-keyboard clipboard search box.
+     */
+    interface TextRedirect {
+        fun commit(text: String)
+        fun backspace()
+        fun clear()
+        fun enter()
+
+        /** the redirect was dropped by the service (e.g. keyboard hidden) */
+        fun cancel()
+    }
+
+    var textRedirect: TextRedirect? = null
+        set(value) {
+            if (field === value) return
+            field = value
+            // drop any half-typed pinyin when switching target
+            postFcitxJob { reset() }
+        }
+
     private fun handleDeleteSurrounding(before: Int, after: Int) {
+        if (textRedirect != null) return
         val ic = currentInputConnection ?: return
         if (before > 0) {
             selection.predictOffset(-before)
@@ -350,6 +373,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleBackspaceKey() {
+        textRedirect?.let { it.backspace(); return }
         val lastSelection = selection.latest
         if (lastSelection.isNotEmpty()) {
             selection.predict(lastSelection.start)
@@ -381,6 +405,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleReturnKey() {
+        textRedirect?.let { it.enter(); return }
         currentInputEditorInfo.run {
             if (inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL ||
                 imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_ENTER_ACTION)
@@ -401,6 +426,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleArrowKey(keyCode: Int) {
+        if (textRedirect != null) return
         val type = currentInputEditorInfo.inputType and InputType.TYPE_MASK_CLASS
         val variation = currentInputEditorInfo.inputType and InputType.TYPE_MASK_VARIATION
         if (type == InputType.TYPE_NULL ||
@@ -421,6 +447,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
+        textRedirect?.let { it.commit(text); return }
+        commitTextToEditor(text, cursor)
+    }
+
+    /** Commit to the app's editor, bypassing [textRedirect] (e.g. pasting a search result) */
+    fun commitTextToEditor(text: String, cursor: Int = -1) {
         val ic = currentInputConnection ?: return
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -442,7 +474,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         if (cursor == -1) {
             selection.predict(start + text.length)
-            ic.commitText(text, 1)
+            if (text.length <= LargeTextChunk) {
+                ic.commitText(text, 1)
+            } else {
+                // A single commitText() is one Binder transaction (~1MB limit), which
+                // silently drops very large pastes. Commit in chunks instead.
+                ic.withBatchEdit {
+                    var i = 0
+                    while (i < text.length) {
+                        var end = minOf(i + LargeTextChunk, text.length)
+                        // never split a surrogate pair
+                        if (end < text.length && Character.isHighSurrogate(text[end - 1])) end--
+                        commitText(text.substring(i, end), 1)
+                        i = end
+                    }
+                }
+            }
         } else {
             val target = start + cursor
             selection.predict(target)
@@ -486,6 +533,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun deleteSelection() {
+        if (textRedirect != null) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         selection.predict(lastSelection.start)
@@ -514,6 +562,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
+        if (textRedirect != null) return
         val lastSelection = selection.latest
         currentInputConnection?.also {
             val start = max(lastSelection.start + offsetStart, 0)
@@ -522,6 +571,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             selection.predict(start, end)
             it.setSelection(start, end)
         }
+    }
+
+    /**
+     * Delete everything before the cursor (and the selection, if any);
+     * text after the cursor is left untouched.
+     * No select-all is involved, so there's no visible selection flash in apps
+     * that don't honor batch edits (e.g. QQ).
+     */
+    fun clearTextBeforeCursor() {
+        textRedirect?.let { it.clear(); return }
+        val ic = currentInputConnection ?: return
+        ic.withBatchEdit {
+            finishComposingText()
+            if (selection.latest.isNotEmpty()) commitText("", 1)
+            deleteSurroundingText(ClearAllChunk, 0)
+        }
+        selection.predict(0)
     }
 
     fun cancelSelection() {
@@ -920,6 +986,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // because of https://android.googlesource.com/platform/frameworks/base.git/+/refs/tags/android-11.0.0_r45/core/java/android/view/inputmethod/BaseInputConnection.java#851
     // it's not possible to set cursor inside composing text
     private fun updateComposingText(text: FormattedText) {
+        // pinyin being typed into the search box must not show up in the app
+        if (textRedirect != null) return
         val ic = currentInputConnection ?: return
         val lastSelection = selection.latest
         ic.beginBatchEdit()
@@ -1049,6 +1117,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        // let the owner (clipboard search) reset its UI, so it never believes it's
+        // still capturing input while keys go to the app
+        textRedirect?.let {
+            textRedirect = null
+            it.cancel()
+        }
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
         currentInputConnection?.apply {
@@ -1119,5 +1193,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     companion object {
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
         const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
+        // large but far from Int.MAX_VALUE, so editors computing `cursor + n` don't overflow
+        const val ClearAllChunk = 100_000_000
+        // chars per commitText() when pasting large text; well below the Binder limit
+        const val LargeTextChunk = 64 * 1024
     }
 }

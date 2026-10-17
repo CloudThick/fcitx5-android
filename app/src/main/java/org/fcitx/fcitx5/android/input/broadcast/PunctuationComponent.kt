@@ -23,7 +23,8 @@ class PunctuationComponent :
     private val service by manager.inputMethodService()
     private val broadcaster: InputBroadcaster by manager.must()
 
-    private var mapping: Map<String, String> = emptyMap()
+    var mapping: Map<String, String> = emptyMap()
+        private set
 
     var enabled: Boolean = false
         private set
