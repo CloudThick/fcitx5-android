@@ -346,6 +346,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         fun backspace()
         fun clear()
         fun enter()
+
+        /** the redirect was dropped by the service (e.g. keyboard hidden) */
+        fun cancel()
     }
 
     var textRedirect: TextRedirect? = null
@@ -1114,7 +1117,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
-        textRedirect = null
+        // let the owner (clipboard search) reset its UI, so it never believes it's
+        // still capturing input while keys go to the app
+        textRedirect?.let {
+            textRedirect = null
+            it.cancel()
+        }
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
         currentInputConnection?.apply {

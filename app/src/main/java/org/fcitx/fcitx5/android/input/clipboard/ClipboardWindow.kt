@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.PopupMenu
+import androidx.transition.Transition
 import androidx.annotation.Keep
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
@@ -148,6 +149,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(),
         }
         override fun clear() = setQuery("")
         override fun enter() = stopTyping()
+        override fun cancel() = stopTyping()
     }
 
     private val textKeyboard by lazy { TextKeyboard(context, theme) }
@@ -278,8 +280,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(),
             }
 
             override fun onPaste(entry: ClipboardEntry) {
-                // keep the filtered results, but the paste itself must reach the app
-                stopTyping()
+                // stay in search (query, results and embedded keyboard untouched);
+                // the paste itself must bypass the redirect and reach the app
                 service.commitTextToEditor(entry.text)
                 if (clipboardReturnAfterPaste) windowManager.attachWindow(KeyboardWindow)
             }
@@ -458,6 +460,13 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(),
     }
 
     override fun onCreateBarExtension(): View = ui.extension
+
+    /**
+     * No fade-out when leaving: a fading view is redrawn from an overlay on every
+     * animation frame, which is expensive for a staggered grid full of text cards
+     * and shows up as a stutter when returning to the keyboard.
+     */
+    override fun exitAnimation(nextWindow: InputWindow): Transition? = null
 
     companion object {
         /** search bar (40dp) + results area (180dp) */
