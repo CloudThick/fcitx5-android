@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.input.dialog.InputMethodPickerDialog
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Reset
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Selection
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Stopped
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ClearAllAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
