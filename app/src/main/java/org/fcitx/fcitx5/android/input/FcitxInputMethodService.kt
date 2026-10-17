@@ -442,7 +442,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         if (cursor == -1) {
             selection.predict(start + text.length)
-            ic.commitText(text, 1)
+            if (text.length <= LargeTextChunk) {
+                ic.commitText(text, 1)
+            } else {
+                // A single commitText() is one Binder transaction (~1MB limit), which
+                // silently drops very large pastes. Commit in chunks instead.
+                ic.withBatchEdit {
+                    var i = 0
+                    while (i < text.length) {
+                        var end = minOf(i + LargeTextChunk, text.length)
+                        // never split a surrogate pair
+                        if (end < text.length && Character.isHighSurrogate(text[end - 1])) end--
+                        commitText(text.substring(i, end), 1)
+                        i = end
+                    }
+                }
+            }
         } else {
             val target = start + cursor
             selection.predict(target)
@@ -521,6 +536,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             if (start > end) return
             selection.predict(start, end)
             it.setSelection(start, end)
+        }
+    }
+
+    /**
+     * Clear every character in the current editor.
+     * "Select all + commit empty" covers most editors; the surrounding-text delete
+     * is a fallback for editors that ignore the select-all context menu action.
+     */
+    fun clearAllText() {
+        currentInputConnection?.apply {
+            beginBatchEdit()
+            finishComposingText()
+            performContextMenuAction(android.R.id.selectAll)
+            commitText("", 1)
+            deleteSurroundingText(ClearAllChunk, ClearAllChunk)
+            endBatchEdit()
         }
     }
 
@@ -1119,5 +1150,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     companion object {
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
         const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
+        // large but far from Int.MAX_VALUE, so editors computing `cursor + n` don't overflow
+        const val ClearAllChunk = 100_000_000
+        // chars per commitText() when pasting large text; well below the Binder limit
+        const val LargeTextChunk = 64 * 1024
     }
 }

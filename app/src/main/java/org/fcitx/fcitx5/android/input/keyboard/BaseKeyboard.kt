@@ -179,20 +179,27 @@ abstract class BaseKeyboard(
                 swipeEnabled = true
                 swipeRepeatEnabled = true
                 swipeThresholdX = selectionSwipeThreshold
-                swipeThresholdY = disabledSwipeThreshold
+                // swipe up to clear all (WeChat-style)
+                swipeThresholdY = inputSwipeThreshold
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
                         GestureType.Move -> {
                             val count = event.countX
-                            if (count != 0) {
+                            // once swiping vertically, ignore horizontal drift
+                            if (count != 0 && event.totalY == 0) {
                                 onAction(KeyAction.MoveSelectionAction(count))
                                 if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
                                 true
                             } else false
                         }
                         GestureType.Up -> {
-                            onAction(KeyAction.DeleteSelectionAction(event.totalX))
-                            false
+                            if (event.totalY < 0) {
+                                onAction(KeyAction.ClearAllAction)
+                                true
+                            } else {
+                                onAction(KeyAction.DeleteSelectionAction(event.totalX))
+                                false
+                            }
                         }
                         else -> false
                     }

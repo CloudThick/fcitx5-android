@@ -161,6 +161,14 @@ class CommonKeyActionListener :
                     }
                     backspaceSwipeState = Stopped
                 }
+                is ClearAllAction -> {
+                    backspaceSwipeState = Stopped
+                    if (!preeditState.isEmpty) {
+                        service.postFcitxJob { reset() }
+                    } else {
+                        service.clearAllText()
+                    }
+                }
                 is PickerSwitchAction -> {
                     // update lastSymbolType only when specified explicitly
                     val key = action.key?.also { k -> lastPickerType = k.name }

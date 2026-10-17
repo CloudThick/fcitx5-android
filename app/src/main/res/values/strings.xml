@@ -329,4 +329,10 @@
     <string name="return_key_next">Next</string>
     <string name="return_key_previous">Prev</string>
     <string name="return_key_done">Done</string>
+    <string name="key_text_scale">Key label size</string>
+    <string name="key_text_scale_xsmall">Extra small (80%)</string>
+    <string name="key_text_scale_small">Small (88%)</string>
+    <string name="key_text_scale_medium">Medium (94%)</string>
+    <string name="key_text_scale_default">Default (100%)</string>
+    <string name="key_text_scale_large">Large (108%)</string>
 </resources>

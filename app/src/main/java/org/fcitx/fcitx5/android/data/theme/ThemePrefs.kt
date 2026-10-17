@@ -90,6 +90,22 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val clipboardEntryRadius =
         int(R.string.clipboard_entry_radius, "clipboard_entry_radius", 2, 0, 48, "dp")
 
+    /** Fine-grained key label size presets, relative to upstream's sizes. */
+    enum class KeyTextScale(override val stringRes: Int, val factor: Float) : ManagedPreferenceEnum {
+        XSmall(R.string.key_text_scale_xsmall, 0.80f),
+        Small(R.string.key_text_scale_small, 0.88f),
+        Medium(R.string.key_text_scale_medium, 0.94f),
+        Default(R.string.key_text_scale_default, 1.00f),
+        Large(R.string.key_text_scale_large, 1.08f);
+    }
+
+    val keyTextScale = enumList(
+        R.string.key_text_scale,
+        "key_text_scale",
+        // WeChat's key labels are a bit smaller than upstream's
+        KeyTextScale.Small
+    )
+
     enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
         None(R.string.punctuation_pos_none),
         Bottom(R.string.punctuation_pos_bottom),

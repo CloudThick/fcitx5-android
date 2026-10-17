@@ -13,11 +13,14 @@ name: Build APK (WeChat style)
 # The app and the RIME plugin MUST be signed with the same key: the plugin
 # permission is signature-protected, so always install both from the same run.
 
+# push only (no pull_request trigger) so each commit is built once
 on:
   push:
-    branches-ignore: [master]
-  pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -30,6 +33,14 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      # Forks don't carry upstream's tags; without them `git describe` falls back to a
+      # bare commit hash. Fetch them so versionName matches official builds
+      # (e.g. 0.1.3-12-gabcdef0).
+      - name: Fetch upstream tags
+        run: |
+          git fetch --tags --force https://github.com/fcitx5-android/fcitx5-android.git
+          git describe --tags --long --always
 
       - name: Install system dependencies
         run: |

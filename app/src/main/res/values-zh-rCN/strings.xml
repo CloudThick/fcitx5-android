@@ -329,4 +329,10 @@
     <string name="return_key_next">下一项</string>
     <string name="return_key_previous">上一项</string>
     <string name="return_key_done">完成</string>
+    <string name="key_text_scale">按键字体大小</string>
+    <string name="key_text_scale_xsmall">特小 (80%)</string>
+    <string name="key_text_scale_small">小 (88%)</string>
+    <string name="key_text_scale_medium">中 (94%)</string>
+    <string name="key_text_scale_default">默认 (100%)</string>
+    <string name="key_text_scale_large">大 (108%)</string>
 </resources>
