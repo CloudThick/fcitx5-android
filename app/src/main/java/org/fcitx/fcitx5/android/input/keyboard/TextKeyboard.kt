@@ -54,8 +54,8 @@ class TextKeyboard(
                 DualSymbolAlphabetKey("F", ";", "；"),
                 DualSymbolAlphabetKey("G", "(", "（"),
                 DualSymbolAlphabetKey("H", ")", "）"),
-                // ~ stays half-width even in Chinese text
-                DualSymbolAlphabetKey("J", "~", "~"),
+                // like WeChat: full-width ～ in Chinese mode
+                DualSymbolAlphabetKey("J", "~", "～"),
                 DualSymbolAlphabetKey("K", "\"", "“"),
                 DualSymbolAlphabetKey("L", "'", "”")
             ),
