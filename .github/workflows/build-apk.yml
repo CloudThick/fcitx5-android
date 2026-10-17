@@ -1,0 +1,93 @@
+name: Build APK (WeChat style)
+
+# Builds an installable, signed arm64 APK of the app and the RIME plugin.
+#
+# Signing: set these repository secrets to keep the same key across builds
+# (required to install updates over an existing install without losing data):
+#   SIGN_KEY_BASE64  base64 of a .jks/.keystore file
+#   SIGN_KEY_ALIAS   key alias
+#   SIGN_KEY_PWD     store & key password
+# Without them, a throwaway key is generated per run. The APKs still install,
+# but every new build has to be installed after uninstalling the previous one.
+#
+# The app and the RIME plugin MUST be signed with the same key: the plugin
+# permission is signature-protected, so always install both from the same run.
+
+on:
+  push:
+    branches-ignore: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_ABI: arm64-v8a
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y extra-cmake-modules gettext
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v3
+        with:
+          packages: cmake;3.31.6
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare signing key
+        env:
+          SECRET_KEY: ${{ secrets.SIGN_KEY_BASE64 }}
+          SECRET_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
+          SECRET_PWD: ${{ secrets.SIGN_KEY_PWD }}
+        run: |
+          if [ -n "$SECRET_KEY" ]; then
+            echo "$SECRET_KEY" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "SIGN_KEY_ALIAS=$SECRET_ALIAS" >> "$GITHUB_ENV"
+            echo "SIGN_KEY_PWD=$SECRET_PWD" >> "$GITHUB_ENV"
+            echo "Using signing key from repository secrets"
+          else
+            PWD_TMP="$(openssl rand -hex 16)"
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/release.jks" \
+              -alias ephemeral -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$PWD_TMP" -keypass "$PWD_TMP" \
+              -dname "CN=fcitx5-android fork ephemeral"
+            echo "::add-mask::$PWD_TMP"
+            echo "SIGN_KEY_ALIAS=ephemeral" >> "$GITHUB_ENV"
+            echo "SIGN_KEY_PWD=$PWD_TMP" >> "$GITHUB_ENV"
+            echo "::warning::No SIGN_KEY_BASE64 secret set; using a throwaway signing key for this run"
+          fi
+          echo "SIGN_KEY_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build app and RIME plugin
+        run: |
+          ./gradlew :app:assembleRelease :plugin:rime:assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/*.apk out/
+          cp plugin/rime/build/outputs/apk/release/*.apk out/
+          rm -f "$RUNNER_TEMP/release.jks"
+          ls -l out
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcitx5-wechat-style-arm64
+          path: out/*.apk

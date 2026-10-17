@@ -30,58 +30,89 @@ class TextKeyboard(
     companion object {
         const val Name = "Text"
 
+        /**
+         * WeChat-style layout. Each letter carries an English and a Chinese swipe symbol;
+         * the Chinese one is used (and displayed) while Chinese punctuation is active.
+         */
         val Layout: List<List<KeyDef>> = listOf(
             listOf(
-                AlphabetKey("Q", "1"),
-                AlphabetKey("W", "2"),
-                AlphabetKey("E", "3"),
-                AlphabetKey("R", "4"),
-                AlphabetKey("T", "5"),
-                AlphabetKey("Y", "6"),
-                AlphabetKey("U", "7"),
-                AlphabetKey("I", "8"),
-                AlphabetKey("O", "9"),
-                AlphabetKey("P", "0")
+                DualSymbolAlphabetKey("Q", "1"),
+                DualSymbolAlphabetKey("W", "2"),
+                DualSymbolAlphabetKey("E", "3"),
+                DualSymbolAlphabetKey("R", "4"),
+                DualSymbolAlphabetKey("T", "5"),
+                DualSymbolAlphabetKey("Y", "6"),
+                DualSymbolAlphabetKey("U", "7"),
+                DualSymbolAlphabetKey("I", "8"),
+                DualSymbolAlphabetKey("O", "9"),
+                DualSymbolAlphabetKey("P", "0")
             ),
             listOf(
-                AlphabetKey("A", "@"),
-                AlphabetKey("S", "*"),
-                AlphabetKey("D", "+"),
-                AlphabetKey("F", "-"),
-                AlphabetKey("G", "="),
-                AlphabetKey("H", "/"),
-                AlphabetKey("J", "#"),
-                AlphabetKey("K", "("),
-                AlphabetKey("L", ")")
+                DualSymbolAlphabetKey("A", "-", "-"),
+                DualSymbolAlphabetKey("S", "/", "/"),
+                DualSymbolAlphabetKey("D", ":", "："),
+                DualSymbolAlphabetKey("F", ";", "；"),
+                DualSymbolAlphabetKey("G", "(", "（"),
+                DualSymbolAlphabetKey("H", ")", "）"),
+                DualSymbolAlphabetKey("J", "~", "～"),
+                DualSymbolAlphabetKey("K", "\"", "“"),
+                DualSymbolAlphabetKey("L", "'", "”")
             ),
             listOf(
                 CapsKey(),
-                AlphabetKey("Z", "'"),
-                AlphabetKey("X", ":"),
-                AlphabetKey("C", "\""),
-                AlphabetKey("V", "?"),
-                AlphabetKey("B", "!"),
-                AlphabetKey("N", "~"),
-                AlphabetKey("M", "\\"),
+                DualSymbolAlphabetKey("Z", "@", "@"),
+                DualSymbolAlphabetKey("X", ".", "。"),
+                DualSymbolAlphabetKey("C", "#", "#"),
+                DualSymbolAlphabetKey("V", "&", "、"),
+                DualSymbolAlphabetKey("B", "?", "？"),
+                DualSymbolAlphabetKey("N", "!", "！"),
+                DualSymbolAlphabetKey("M", "_", "…"),
                 BackspaceKey()
             ),
             listOf(
-                LayoutSwitchKey("?123", ""),
-                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
-                LanguageKey(),
+                LayoutSwitchKey("123", "", 0.15f),
+                WeChatCommaKey(),
                 SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
-                ReturnKey()
+                LangToggleKey(),
+                TextReturnKey()
             )
         )
+
+        /** English swipe symbol -> Chinese swipe symbol, derived from [Layout]. */
+        private val ZhSymbols: Map<String, String> = buildMap {
+            // comma key's main label
+            put(",", "，")
+            Layout.flatten().forEach { def ->
+                def.behaviors.forEach { b ->
+                    if (b is KeyDef.Behavior.Swipe && b.action is KeyAction.ModeSymbolAction) {
+                        put(b.action.en, b.action.zh)
+                    }
+                }
+            }
+        }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
     val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
-    val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
-    val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
+    val lang: AltTextKeyView by lazy { findViewById(R.id.button_lang) }
     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
-    val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
+    val `return`: TextKeyView by lazy { findViewById(R.id.button_return) }
+
+    /**
+     * Chinese punctuation is active iff fcitx reports a non-empty punctuation mapping,
+     * i.e. a Chinese input method with the punctuation addon switched on (中标).
+     */
+    private val chineseSymbols: Boolean
+        get() = punctuationMapping.isNotEmpty() || rimeChinese
+
+    /**
+     * RIME handles punctuation itself, so fcitx reports no mapping for it.
+     * Treat RIME outside of ascii mode as Chinese punctuation.
+     */
+    private var rimeChinese = false
+
+    private fun modeSymbol(en: String): String =
+        if (chineseSymbols) ZhSymbols[en] ?: transformPunctuation(en) else en
 
     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
 
@@ -114,6 +145,13 @@ class TextKeyboard(
     private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
+        if (action is KeyAction.ModeSymbolAction) {
+            // Chinese symbols are committed as-is; English ones go through fcitx
+            val resolved = if (chineseSymbols) KeyAction.CommitAction(action.zh)
+            else symbolAction(action.en)
+            super.onAction(resolved, source)
+            return
+        }
         var transformed = action
         when (action) {
             is KeyAction.FcitxKeyAction -> when (source) {
@@ -156,7 +194,17 @@ class TextKeyboard(
     }
 
     override fun onReturnDrawableUpdate(returnDrawable: Int) {
-        `return`.img.imageResource = returnDrawable
+        `return`.mainText.setText(
+            when (returnDrawable) {
+                R.drawable.ic_baseline_arrow_forward_24 -> R.string.return_key_go
+                R.drawable.ic_baseline_search_24 -> R.string.return_key_search
+                R.drawable.ic_baseline_send_24 -> R.string.return_key_send
+                R.drawable.ic_baseline_keyboard_tab_24 -> R.string.return_key_next
+                R.drawable.ic_baseline_keyboard_tab_reverse_24 -> R.string.return_key_previous
+                R.drawable.ic_baseline_done_24 -> R.string.return_key_done
+                else -> R.string.return_key_newline
+            }
+        )
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
@@ -169,15 +217,42 @@ class TextKeyboard(
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
         }
+        updateLangToggleKey(ime)
         if (capsState != CapsState.None) {
             switchCapsState()
+        }
+    }
+
+    /**
+     * Big label = current mode, small label = mode after tapping.
+     * English when the active IM is a plain keyboard layout, or RIME is in ascii mode
+     * (fcitx5-rime reports sub mode label "A" then).
+     */
+    private fun updateLangToggleKey(ime: InputMethodEntry) {
+        val english = ime.uniqueName.startsWith("keyboard-") || ime.subMode.label == "A"
+        val newRimeChinese = ime.addon == "rime" && !english
+        if (newRimeChinese != rimeChinese) {
+            rimeChinese = newRimeChinese
+            updatePunctuationKeys()
+        }
+        if (english) {
+            lang.mainText.text = "英"
+            lang.altText.text = "中"
+        } else {
+            // e.g. "双" for Shuangpin, "拼" for Pinyin; fall back to "中"
+            val label = ime.subMode.label.ifEmpty { ime.label }
+            val first = label.firstOrNull()
+            lang.mainText.text =
+                if (first != null && Character.UnicodeScript.of(first.code) == Character.UnicodeScript.HAN)
+                    first.toString() else "中"
+            lang.altText.text = "英"
         }
     }
 
     private fun transformPopupPreview(c: String): String {
         if (c.length != 1) return c
         if (c[0].isLetter()) return transformAlphabet(c)
-        return transformPunctuation(c)
+        return modeSymbol(c)
     }
 
     override fun onPopupAction(action: PopupAction) {
@@ -235,7 +310,9 @@ class TextKeyboard(
 
     private fun updateAlphabetKeys() {
         textKeys.forEach {
-            if (it.def !is KeyDef.Appearance.AltText) return
+            if (it.def !is KeyDef.Appearance.AltText) return@forEach
+            // 中/英 key labels are managed by updateLangToggleKey()
+            if (it.id == R.id.button_lang) return@forEach
             it.mainText.text = it.def.displayText.let { str ->
                 if (str.length != 1 || !str[0].isLetter()) return@forEach
                 if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
@@ -246,12 +323,19 @@ class TextKeyboard(
     private fun updatePunctuationKeys() {
         textKeys.forEach {
             if (it is AltTextKeyView) {
+                if (it.id == R.id.button_lang) return@forEach
                 it.def as KeyDef.Appearance.AltText
-                it.altText.text = transformPunctuation(it.def.altText)
+                it.altText.text = modeSymbol(it.def.altText)
+                // punctuation main labels (the comma key) follow the mapping too
+                val main = it.def.displayText
+                if (main.isNotEmpty() && !main[0].isLetter()) {
+                    it.mainText.text = modeSymbol(main)
+                }
             } else {
                 it.def as KeyDef.Appearance.Text
                 it.mainText.text = it.def.displayText.let { str ->
-                    if (str[0].run { isLetter() || isWhitespace() }) return@forEach
+                    // empty: labels set at runtime (e.g. the text return key)
+                    if (str.isEmpty() || str[0].run { isLetter() || isWhitespace() }) return@forEach
                     transformPunctuation(str)
                 }
             }

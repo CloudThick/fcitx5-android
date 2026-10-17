@@ -122,6 +122,7 @@
     <string name="punctuation_position">Punctuation position</string>
     <string name="punctuation_pos_bottom">Bottom (Portrait only)</string>
     <string name="punctuation_pos_top_right">Top Right</string>
+    <string name="punctuation_pos_top">Top (centered)</string>
     <string name="punctuation_pos_none">None</string>
     <string name="expand_toolbar_by_default">Expand toolbar by default</string>
     <string name="popup_on_key_press">Popup on key press</string>
@@ -321,4 +322,11 @@
     <string name="keyboard_height_percent_base">Keyboard height percent base</string>
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
     <string name="real_size">Real size (Display.getRealSize)</string>
+    <string name="return_key_newline">Return</string>
+    <string name="return_key_go">Go</string>
+    <string name="return_key_search">Search</string>
+    <string name="return_key_send">Send</string>
+    <string name="return_key_next">Next</string>
+    <string name="return_key_previous">Prev</string>
+    <string name="return_key_done">Done</string>
 </resources>

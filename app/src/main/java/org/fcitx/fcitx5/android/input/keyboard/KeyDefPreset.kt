@@ -18,6 +18,15 @@ import org.fcitx.fcitx5.android.input.picker.PickerWindow
 
 val NumLockState = KeyStates(KeyState.NumLock, KeyState.Virtual)
 
+/**
+ * ASCII symbols go through fcitx so that the active punctuation mapping applies
+ * (e.g. `,` becomes `，` in Chinese mode). Non-ASCII symbols such as `、` or `…`
+ * have no key sym equivalent and are committed directly.
+ */
+fun symbolAction(symbol: String): KeyAction =
+    if (symbol.length == 1 && symbol[0].code < 0x80) KeyAction.FcitxKeyAction(symbol)
+    else KeyAction.CommitAction(symbol)
+
 class SymbolKey(
     val symbol: String,
     percentWidth: Float = 0.1f,
@@ -53,10 +62,37 @@ class AlphabetKey(
     ),
     setOf(
         Behavior.Press(KeyAction.FcitxKeyAction(character)),
-        Behavior.Swipe(KeyAction.FcitxKeyAction(punctuation))
+        Behavior.Swipe(symbolAction(punctuation))
     ),
     popup ?: arrayOf(
         Popup.AltPreview(character, punctuation),
+        Popup.Keyboard.Preset(character)
+    )
+)
+
+/**
+ * Letter key whose swipe symbol depends on punctuation mode:
+ * [zh] is used while Chinese punctuation is active, [en] otherwise.
+ * The small label is switched accordingly by [TextKeyboard].
+ */
+class DualSymbolAlphabetKey(
+    val character: String,
+    val en: String,
+    val zh: String = en,
+    variant: Variant = Variant.Normal
+) : KeyDef(
+    Appearance.AltText(
+        displayText = character,
+        altText = en,
+        textSize = 23f,
+        variant = variant
+    ),
+    setOf(
+        Behavior.Press(KeyAction.FcitxKeyAction(character)),
+        Behavior.Swipe(KeyAction.ModeSymbolAction(en, zh))
+    ),
+    arrayOf(
+        Popup.AltPreview(character, en),
         Popup.Keyboard.Preset(character)
     )
 )
@@ -328,4 +364,94 @@ class NumPadKey(
     setOf(
         Behavior.Press(KeyAction.SymAction(KeySym(sym), NumLockState))
     )
+)
+
+/**
+ * WeChat-style comma key: tap for `，`, swipe for `。` (shown as a small label),
+ * long press for the Emoji / QuickPhrase / Unicode menu.
+ */
+class WeChatCommaKey(
+    percentWidth: Float = 0.1f,
+    variant: Variant = Variant.Normal
+) : KeyDef(
+    Appearance.AltText(
+        displayText = ",",
+        altText = ".",
+        textSize = 23f,
+        percentWidth = percentWidth,
+        variant = variant
+    ),
+    setOf(
+        Behavior.Press(KeyAction.FcitxKeyAction(",")),
+        Behavior.Swipe(KeyAction.ModeSymbolAction(".", "。"))
+    ),
+    arrayOf(
+        Popup.AltPreview(",", "."),
+        Popup.Menu(
+            arrayOf(
+                Popup.Menu.Item(
+                    "Emoji",
+                    R.drawable.ic_baseline_tag_faces_24,
+                    KeyAction.PickerSwitchAction()
+                ),
+                Popup.Menu.Item(
+                    "QuickPhrase",
+                    R.drawable.ic_baseline_format_quote_24,
+                    KeyAction.QuickPhraseAction
+                ),
+                Popup.Menu.Item(
+                    "Unicode",
+                    R.drawable.ic_logo_unicode,
+                    KeyAction.UnicodeAction
+                )
+            )
+        )
+    )
+)
+
+/**
+ * WeChat-style `中/英` key. The big label shows the *current* mode and the small
+ * label the mode a tap switches to; both are updated at runtime by
+ * [TextKeyboard.onInputMethodUpdate]. Long press opens the input method picker.
+ */
+class LangToggleKey(percentWidth: Float = 0.1f) : KeyDef(
+    Appearance.AltText(
+        displayText = "中",
+        altText = "英",
+        textSize = 18f,
+        percentWidth = percentWidth,
+        variant = Variant.Normal,
+        viewId = R.id.button_lang
+    ),
+    setOf(
+        Behavior.Press(KeyAction.LangSwitchAction),
+        Behavior.LongPress(KeyAction.ShowInputMethodPickerAction)
+    )
+)
+
+/**
+ * Return key rendered as text (`换行`, `发送`, `搜索` ...) instead of an icon.
+ * The label follows the editor action, see [TextKeyboard.onReturnDrawableUpdate].
+ */
+class TextReturnKey(percentWidth: Float = 0.2f) : KeyDef(
+    Appearance.Text(
+        displayText = "",
+        textSize = 16f,
+        percentWidth = percentWidth,
+        variant = Variant.Alternative,
+        viewId = R.id.button_return,
+        soundEffect = InputFeedbacks.SoundEffect.Return
+    ),
+    setOf(
+        Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))
+    ),
+    arrayOf(
+        Popup.Menu(
+            arrayOf(
+                Popup.Menu.Item(
+                    "Emoji", R.drawable.ic_baseline_tag_faces_24, KeyAction.PickerSwitchAction()
+                )
+            )
+        )
+    ),
 )

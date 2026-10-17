@@ -60,6 +60,61 @@ object ThemePreset {
         genericActiveForegroundColor = 0xffffffff
     )
 
+    /**
+     * Colors sampled from WeChat Keyboard (微信输入法) on Android.
+     */
+    val WeChatLight = Theme.Builtin(
+        name = "WeChatLight",
+        isDark = false,
+        backgroundColor = 0xffe8eaed,
+        barColor = 0xffe8eaed,
+        keyboardColor = 0xffe8eaed,
+        keyBackgroundColor = 0xffffffff,
+        keyTextColor = 0xff1a1a1a,
+        candidateTextColor = 0xff1a1a1a,
+        candidateLabelColor = 0xff1a1a1a,
+        candidateCommentColor = 0xff8a8a8a,
+        altKeyBackgroundColor = 0xffcacfd6,
+        altKeyTextColor = 0xff8a8a8a,
+        accentKeyBackgroundColor = 0xff07c160,
+        accentKeyTextColor = 0xffffffff,
+        keyPressHighlightColor = 0x1f000000,
+        keyShadowColor = 0xffb3b8bf,
+        popupBackgroundColor = 0xffffffff,
+        popupTextColor = 0xff1a1a1a,
+        spaceBarColor = 0xffffffff,
+        dividerColor = 0x1f000000,
+        clipboardEntryColor = 0xffffffff,
+        genericActiveBackgroundColor = 0xff07c160,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
+    val WeChatDark = Theme.Builtin(
+        name = "WeChatDark",
+        isDark = true,
+        backgroundColor = 0xff1e1e1e,
+        barColor = 0xff1e1e1e,
+        keyboardColor = 0xff1e1e1e,
+        keyBackgroundColor = 0xff3a3a3a,
+        keyTextColor = 0xffe8e8e8,
+        candidateTextColor = 0xffe8e8e8,
+        candidateLabelColor = 0xffe8e8e8,
+        candidateCommentColor = 0xff9a9a9a,
+        altKeyBackgroundColor = 0xff2b2b2b,
+        altKeyTextColor = 0xff9a9a9a,
+        accentKeyBackgroundColor = 0xff07c160,
+        accentKeyTextColor = 0xffffffff,
+        keyPressHighlightColor = 0x33ffffff,
+        keyShadowColor = 0xff121212,
+        popupBackgroundColor = 0xff2e2e2e,
+        popupTextColor = 0xffe8e8e8,
+        spaceBarColor = 0xff3a3a3a,
+        dividerColor = 0x1fffffff,
+        clipboardEntryColor = 0xff3a3a3a,
+        genericActiveBackgroundColor = 0xff07c160,
+        genericActiveForegroundColor = 0xffffffff
+    )
+
     val PixelLight = Theme.Builtin(
         name = "PixelLight",
         isDark = false,

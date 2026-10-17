@@ -324,6 +324,31 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         }
     }
 
+    /**
+     * WeChat-style: a small, regular-weight symbol centered above the letter,
+     * with the letter itself pushed slightly below the vertical center.
+     */
+    private fun applyTopAltTextPosition() {
+        mainText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            // reset
+            bottomToTop = unset
+            // set
+            topToTop = parentId; topMargin = vMargin + dp(6)
+            bottomToBottom = parentId; bottomMargin = vMargin
+        }
+        altText.visibility = View.VISIBLE
+        altText.setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
+        altText.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            // reset
+            bottomToBottom = unset; bottomMargin = 0
+            rightMargin = 0
+            // set
+            leftToLeft = parentId
+            rightToRight = parentId
+            topToTop = parentId; topMargin = vMargin + dp(2)
+        }
+    }
+
     private fun applyBottomAltTextPosition() {
         mainText.updateLayoutParams<ConstraintLayout.LayoutParams> {
             // reset
@@ -363,13 +388,16 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
                 else -> applyBottomAltTextPosition()
             }
             PunctuationPosition.TopRight -> applyTopRightAltTextPosition()
+            PunctuationPosition.Top -> applyTopAltTextPosition()
             PunctuationPosition.None -> applyNoAltTextPosition()
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        if (ThemeManager.prefs.punctuationPosition.getValue() == PunctuationPosition.TopRight) {
-            return
+        when (ThemeManager.prefs.punctuationPosition.getValue()) {
+            // orientation-independent layouts
+            PunctuationPosition.TopRight, PunctuationPosition.Top -> return
+            else -> {}
         }
         applyLayout(newConfig.orientation)
     }

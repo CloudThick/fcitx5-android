@@ -21,6 +21,12 @@ sealed class KeyAction {
 
     data class CommitAction(val text: String) : KeyAction()
 
+    /**
+     * A symbol that differs between Chinese and English punctuation mode.
+     * Resolved into a concrete action by [TextKeyboard] before dispatch.
+     */
+    data class ModeSymbolAction(val en: String, val zh: String) : KeyAction()
+
     data class CapsAction(val lock: Boolean) : KeyAction()
 
     data object QuickPhraseAction : KeyAction()
